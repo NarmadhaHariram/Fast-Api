@@ -33,7 +33,7 @@ The Smart Home Price Prediction project aims to provide a user-friendly interfac
 
 ## Folder Structure
 
-martHomePricePrediction/
+SmartHomePricePrediction/
 │
 ├── backend/
 │ ├── database.py
