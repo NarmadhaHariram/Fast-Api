@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Price Estimator</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <!-- jQuery (necessary for DataTables) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/new.css"> <!-- Link to your CSS -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #historyButton {
+            float: right;
+            margin-top: 20px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            max-width: 200px; /* Set a max width for the form */
+            margin-bottom: 20px; /* Add margin to the bottom */
+        }
+        label, input, select {
+            margin-bottom: 10px; /* Space between elements */
+            width: 100%; /* Make inputs take full width */
+        }
+        input, select {
+            padding: 8px; /* Add padding for better appearance */
+            box-sizing: border-box; /* Include padding in total width */
+        }
+        h2 {
+            display: flex;
+            align-items: center;
+        }
+        .selected {
+            background-color: rgba(75, 192, 192, 0.5); /* Highlight color */
+            color: white; /* Change text color */
+        }
+        
+    </style>
+</head>
+<body>
+    <h1>Smart Home Price Estimator <button id="historyButton">History</button></h1>
+    <button id="visualizationButton">Visualization</button>
+    <div id="visualizationContainer" style="display:none;">
+        <h2>Visualization Options</h2>
+        <button onclick="fetchVisualization('top_5_house_values')">Top 5 House Values</button>
+        <button onclick="fetchVisualization('top_prices_by_location')">Top Prices by Location</button>
+        <button onclick="fetchVisualization('top_median_income')">Top Median Income</button>
+        <button onclick="fetchVisualization('most_populated_locations')">Most Populated Locations</button>
+        <button onclick="fetchVisualization('max_ocean_proximity')">Max Ocean Proximity</button>
+        <div id="descriptionContainer" style="margin-top: 20px; font-weight: bold;"></div>
+        <div id="chartContainer" style="margin-top: 20px;"></div>
+    </div>
+    
+    <p>Get an estimated value for your house based on various parameters and view past predictions.</p>
+    
+    <form id="predictionForm" onsubmit="handleFormSubmit(event)">
+        <label for="longitude">Longitude:</label>
+        <input type="number" step="any" id="longitude" required>
+        
+        <label for="latitude">Latitude:</label>
+        <input type="number" step="any" id="latitude" required>
+        
+        <label for="housing_median_age">Housing Median Age:</label>
+        <input type="number" step="any" id="housing_median_age" required>
+        
+        <label for="total_rooms">Total Rooms:</label>
+        <input type="number" step="any" id="total_rooms" required>
+        
+        <label for="total_bedrooms">Total Bedrooms:</label>
+        <input type="number" step="any" id="total_bedrooms" required>
+        
+        <label for="population">Population:</label>
+        <input type="number" step="any" id="population" required>
+        
+        <label for="households">Households:</label>
+        <input type="number" step="any" id="households" required>
+        
+        <label for="median_income">Median Income:</label>
+        <input type="number" step="any" id="median_income" required>
+        
+        <label for="ocean_proximity">Ocean Proximity:</label>
+        <select id="ocean_proximity" required>
+            <option value="<1H OCEAN">&lt; 1H Ocean</option>
+            <option value="INLAND">Inland</option>
+            <option value="ISLAND">Island</option>
+            <option value="NEAR BAY">Near Bay</option>
+            <option value="NEAR OCEAN">Near Ocean</option>
+        </select>
+        
+        <button type="submit">Predict</button>
+    </form>
+
+    <h2 id="resultHeader" style="display:none;">Prediction Result</h2>
+    <div id="result"></div>
+    <table id="resultTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>Predicted House Value</th>
+                <th>Date</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td id="predictedValue"></td>
+                <td id="predictedDate"></td>
+                <td id="predictedTime"></td>
+            </tr>
+        </tbody>
+    </table>
+    <hr> <!-- Added horizontal line here -->
+
+    <h2 id="historyHeader" style="display:none;">
+        Previous Predictions
+    </h2>
+    <div style="overflow: auto; max-height: 300px; width: 100%;">
+        <table id="predictionsTable" class="display" style="display:none;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Longitude</th>
+                    <th>Latitude</th>
+                    <th>Housing Median Age</th>
+                    <th>Total Rooms</th>
+                    <th>Total Bedrooms</th>
+                    <th>Population</th>
+                    <th>Households</th>
+                    <th>Median Income</th>
+                    <th>Ocean Proximity</th>
+                    <th>Predicted House Value</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data will be inserted here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+    <script>
+        // Initialize the DataTable
+        $(document).ready(function() {
+            $('#predictionsTable').DataTable();
+            $('#resultTable').DataTable({
+                searching: false,  // Disable searching for result table
+                paging: false,     // Disable pagination for result table
+                info: false        // Disable info for result table
+            });
+        });
+
+        
+
+        async function handleFormSubmit(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const data = {
+                longitude: parseFloat(document.getElementById('longitude').value),
+                latitude: parseFloat(document.getElementById('latitude').value),
+                housing_median_age: parseFloat(document.getElementById('housing_median_age').value),
+                total_rooms: parseFloat(document.getElementById('total_rooms').value),
+                total_bedrooms: parseFloat(document.getElementById('total_bedrooms').value),
+                population: parseFloat(document.getElementById('population').value),
+                households: parseFloat(document.getElementById('households').value),
+                median_income: parseFloat(document.getElementById('median_income').value),
+                ocean_proximity: document.getElementById('ocean_proximity').value
+            };
+
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            const roundedValue = result.predicted_house_value.toFixed(2); // Round to 2 decimal places
+            document.getElementById('predictedValue').innerText = `$${roundedValue}`;
+            
+            // Split timestamp into date and time
+            const timestamp = new Date(result.timestamp);
+            document.getElementById('predictedDate').innerText = timestamp.toLocaleDateString();
+            document.getElementById('predictedTime').innerText = timestamp.toLocaleTimeString();
+
+            document.getElementById('resultHeader').style.display = 'block'; // Show the result header
+            document.getElementById('resultTable').style.display = 'table'; // Show the result table
+            
+            // Hide the previous predictions header
+            document.getElementById('historyHeader').style.display = 'none';
+            document.getElementById('predictionsTable').style.display = 'none'; // Hide the predictions table
+            addPredictionToTable(result);
+        }
+
+        document.getElementById('historyButton').onclick = async function() {
+            // Hide all other elements
+            document.getElementById('predictionForm').style.display = 'none';
+            document.getElementById('resultHeader').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('resultTable').style.display = 'none';
+            document.getElementById('historyHeader').style.display = 'block'; // Show the history header
+            document.getElementById('predictionsTable').style.display = 'block'; // Show the predictions table
+
+            const response = await fetch('/predictions');
+            const history = await response.json();
+            const table = $('#predictionsTable').DataTable(); // Use DataTable instance
+
+            // Clear existing data
+            table.clear();
+
+            history.forEach(entry => {
+                table.row.add([
+                    entry.id,
+                    entry.longitude,
+                    entry.latitude,
+                    entry.housing_median_age,
+                    entry.total_rooms,
+                    entry.total_bedrooms,
+                    entry.population,
+                    entry.households,
+                    entry.median_income,
+                    entry.ocean_proximity,
+                    entry.predicted_house_value.toFixed(2), // Round to 2 decimal places
+                    entry.timestamp
+                ]);
+            });
+
+            // Draw the updated table
+            table.draw();
+        };
+
+        function addPredictionToTable({ id, longitude, latitude, housing_median_age, total_rooms, total_bedrooms, population, households, median_income, ocean_proximity, predicted_house_value, timestamp }) {
+            const table = $('#predictionsTable').DataTable(); // Use DataTable instance
+            table.row.add([
+                id,
+                longitude,
+                latitude,
+                housing_median_age,
+                total_rooms,
+                total_bedrooms,
+                population,
+                households,
+                median_income,
+                ocean_proximity,
+                predicted_house_value.toFixed(2), // Round to 2 decimal places
+                timestamp
+            ]).draw(false); // Draw without resetting the pagination
+        }
+        document.getElementById('visualizationButton').onclick = function() {
+            document.getElementById('visualizationContainer').style.display = 'block';
+        };
+
+        const descriptions = {
+            top_5_house_values: "This visualization shows the top 5 predicted house values based on previous predictions.",
+            top_prices_by_location: "This chart displays the maximum predicted house values by geographical coordinates (longitude and latitude).",
+            top_median_income: "This visualization highlights the top 5 median incomes from previous predictions.",
+            most_populated_locations: "This chart shows the locations with the highest population counts.",
+            max_ocean_proximity: "This visualization shows the maximum predicted house value for each ocean proximity category."
+        };
+        
+        async function fetchVisualization(caseName, event) {
+            const response = await fetch(`/visualizations/${caseName}`);
+            const data = await response.json();
+
+            console.log(data); // Check the structure of the data returned
+
+            // Display the description
+            document.getElementById('descriptionContainer').innerText = descriptions[caseName] || "No description available.";
+        
+            // Clear previously selected button highlight
+            const buttons = document.querySelectorAll('#visualizationContainer button');
+            buttons.forEach(button => button.classList.remove('selected'));
+        
+            // Highlight the selected button
+            if (event) {
+                event.target.classList.add('selected');
+            }
+        
+            displayChart(caseName, data);
+        }
+        
+        
+        function displayChart(caseName, data) {
+        const chartContainer = document.getElementById('chartContainer');
+        chartContainer.innerHTML = ''; // Clear previous charts
+
+        // Check if data is empty and show a message
+        if (!data || data.length === 0) {
+            chartContainer.innerHTML = "<p>No data available for this visualization.</p>";
+            return;
+        }
+
+        const labels = data.map(item => item.timestamp || item.ocean_proximity || item.longitude || item.latitude);
+        const values = data.map(item => item.predicted_house_value || item.median_income || item.population);
+
+        const chartData = {
+            labels: labels,
+            datasets: [{
+                label: caseName.replace(/_/g, ' ').toUpperCase(),
+                data: values,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        const ctx = document.createElement('canvas');
+        ctx.width = 400;  // Set width
+        ctx.height = 200; // Set height
+        chartContainer.appendChild(ctx);
+
+        new Chart(ctx, {
+            type: 'bar', // Change to 'line', 'pie', etc. as needed
+            data: chartData,
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+        
+    </script>
+</body>
+</html>
