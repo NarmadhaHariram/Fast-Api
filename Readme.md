@@ -184,7 +184,7 @@ Run your Docker container:
 Accessing Your Application
 Once the containers are up and running, you should be able to access your FastAPI application at http://localhost:8000.
 
-## Sample Pages
-![Get Historical Predictions](Historypage.jpg)
+## Pages
 ![Smart Home Predict](indexpage.jpg)
+![Get Historical Predictions](Historypage.jpg)
 ![Top Visualization](topvisualization.jpg)
