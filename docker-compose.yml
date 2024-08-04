@@ -1,0 +1,19 @@
+version: '1.0'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    volumes:
+      - ./backend:/app
+      - ./frontend:/app/frontend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  db:
+    image: sqlite
+    volumes:
+      - ./backend/predictions.db:/app/predictions.db
