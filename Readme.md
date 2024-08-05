@@ -60,7 +60,7 @@ SmartHomePricePrediction/
 ### Prerequisites
 
 - Python 3.8 or later
-- Node.js (for frontend)
+- HTML, CSS, JS (for frontend)
 - Docker (optional)
 
 ### Backend Setup
