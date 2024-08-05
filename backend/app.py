@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, status, Request, Response, HTTPException
-import schemas as schemas  # Adjusted import
-import models as models  # Adjusted import
+import schemas as schemas  
+import models as models  
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
 from fastapi.responses import HTMLResponse
@@ -48,6 +48,7 @@ def dict_to_dataframe(data_dict):
 
 @app.post("/predict/", status_code=status.HTTP_201_CREATED)
 async def create(data: schemas.PredictionsHouse, db: Session = Depends(get_db)):
+    """Gets the User data and predicts the house value"""
     try:
         df = dict_to_dataframe(data.dict())
         df = pd.get_dummies(df)
@@ -89,11 +90,13 @@ async def create(data: schemas.PredictionsHouse, db: Session = Depends(get_db)):
 
 @app.get('/predictions')
 def get_all_houseData(db: Session = Depends(get_db)):
+    """Gets all previous predictions"""
     data = db.query(models.PredictionsHouse).all()
     return data
 
 @app.get('/predictions/{id}', status_code=status.HTTP_200_OK)
 def get_prediction_by_id(id: int, response: Response, db: Session = Depends(get_db)):
+    """Gets all previous predictions and filters based on id"""
     data = db.query(models.PredictionsHouse).filter(models.PredictionsHouse.id == id).first()
     if not data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Id not Found")
@@ -101,6 +104,7 @@ def get_prediction_by_id(id: int, response: Response, db: Session = Depends(get_
 
 @app.get("/visualizations/{case}")
 async def visualizations(case: str, db: Session = Depends(get_db)):
+    """Gets the visualization based on predictions"""
     results = db.query(models.PredictionsHouse).all()
 
     # Convert the SQLAlchemy results to a list of dictionaries
